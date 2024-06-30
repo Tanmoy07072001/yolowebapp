@@ -34,7 +34,7 @@ def display_yolov8_overview():
     """)
 
 def display_detection_metrics(result):
-    num_objects = len(result)
+    num_objects = len(result[0].boxes)
     st.subheader("Number of Objects Detected")
     st.write(num_objects)
 

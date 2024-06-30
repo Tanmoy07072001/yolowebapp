@@ -4,6 +4,10 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
 
 def display_yolov8_overview():
     st.markdown("""
@@ -34,7 +38,7 @@ def display_yolov8_overview():
     """)
 
 def display_detection_metrics(result):
-    num_objects = len(result)
+    num_objects = len(result[0].boxes)
     st.subheader("Number of Objects Detected")
     st.write(num_objects)
 
@@ -70,9 +74,9 @@ def app():
                 label = f'{object_name} {score}'
 
                 if model.names[cls] in selected_objects and score > min_confidence:
-                    cv2.rectangle(annotated_image, (x0, y0), (x1, y1), (255, 0, 0), 2)
+                    cv2.rectangle(annotated_image, (x0, y0), (x1, y1), (255, 0, 0), 4)
                     cv2.putText(annotated_image, label, (x0, y0 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 3)
 
             st.image(annotated_image, caption='Processed Image')
             display_detection_metrics(result)
@@ -94,12 +98,18 @@ def app():
             output_path = os.path.join(os.getcwd(), input_path.split('.')[0] + '_output.mp4')
             out_video = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+            frame_data = []  # List to store frame number and object count
+
             with st.spinner('Processing video...'):
+                frame_count = 0
+                object_count_text = st.empty()
                 while True:
                     ret, frame = video_stream.read()
                     if not ret:
                         break
                     result = model(frame)
+                    num_objects = 0
+
                     for detection in result[0].boxes.data:
                         x0, y0 = (int(detection[0]), int(detection[1]))
                         x1, y1 = (int(detection[2]), int(detection[3]))
@@ -111,20 +121,43 @@ def app():
                         if model.names[cls] in selected_objects and score > min_confidence:
                             cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 0, 0), 2)
                             cv2.putText(frame, label, (x0, y0 - 10),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                            num_objects += 1
 
                     detections = result[0].verbose()
                     cv2.putText(frame, detections, (10, 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # Convert to RGB before writing
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     out_video.write(frame)
+
+                    # Update the number of objects detected for the current frame
+                    object_count_text.text(f'Objects detected: {num_objects} on frame {frame_count}')
+
+                    # Store frame number and object count
+                    frame_data.append([frame_count, num_objects])
+
+                    frame_count += 1
 
                 video_stream.release()
                 out_video.release()
 
             if os.path.exists(output_path):
                 st.video(output_path)
-                display_detection_metrics(result)
+
+            # Create and display the DataFrame
+            df = pd.DataFrame(frame_data, columns=['Frame Number', 'Number of Objects'])
+            st.write(df)
+
+            # Plot the graph
+            fig, ax = plt.subplots()
+            ax.plot(df['Frame Number'], df['Number of Objects'], marker='o')
+            ax.set_title('Objects Detected per Frame')
+            ax.set_xlabel('Frame Number')
+            ax.set_ylabel('Number of Objects')
+            st.pyplot(fig)
+
 
     elif detection_type == "Webcam":
         st.header("Webcam Detection")
