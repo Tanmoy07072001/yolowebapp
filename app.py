@@ -1,11 +1,13 @@
 import os
 import cv2
+import io
 import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from collections import deque
 
 
 
@@ -80,6 +82,7 @@ def app():
 
             st.image(annotated_image, caption='Processed Image')
             display_detection_metrics(result)
+            display_yolov8_overview()
 
     elif detection_type == "Video":
         st.header("Video Detection")
@@ -119,14 +122,14 @@ def app():
                         label = f'{object_name} {score}'
 
                         if model.names[cls] in selected_objects and score > min_confidence:
-                            cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 0, 0), 2)
+                            cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 0, 0), 4)
                             cv2.putText(frame, label, (x0, y0 - 10),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 3)
                             num_objects += 1
 
                     detections = result[0].verbose()
                     cv2.putText(frame, detections, (10, 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
 
                     # Convert to RGB before writing
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -158,6 +161,8 @@ def app():
             ax.set_ylabel('Number of Objects')
             st.pyplot(fig)
 
+            display_yolov8_overview()
+
 
     elif detection_type == "Webcam":
         st.header("Webcam Detection")
@@ -183,16 +188,19 @@ def app():
                     label = f'{object_name} {score}'
 
                     if model.names[cls] in selected_objects and score > min_confidence:
-                        cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 0, 0), 2)
+                        cv2.rectangle(frame, (x0, y0), (x1, y1), (255, 0, 0), 4)
                         cv2.putText(frame, label, (x0, y0 - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 3)
 
                 frame_with_detections = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 stframe.image(frame_with_detections, channels="RGB")
 
-                display_detection_metrics(result)
+                num_objects = len(result[0].boxes)
+                st.subheader("Number of Objects Detected")
+                st.write(num_objects)
 
             video_stream.release()
+
 
 if __name__ == "__main__":
     app()
